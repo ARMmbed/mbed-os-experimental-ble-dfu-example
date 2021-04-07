@@ -1,0 +1,13 @@
+.cproject
+.mbed
+*~
+.settings/*
+BUILD/*
+GettingStarted.html
+__pycache__/*
+makefile.targets
+mbed_config.h
+mbed_settings.py
+signed.hex
+upload.jcommander
+.project
