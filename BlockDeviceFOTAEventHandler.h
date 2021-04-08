@@ -41,7 +41,7 @@ public:
 
     /* Handler overrides for FOTAService */
     FOTAService::StatusCode_t on_binary_stream_written(FOTAService &svc, mbed::Span<const uint8_t> buffer) override;
-    GattAuthCallbackReply_t on_control_written(FOTAService &svc, mbed::Span<const uint8_t> buffer) override;
+    virtual GattAuthCallbackReply_t on_control_written(FOTAService &svc, mbed::Span<const uint8_t> buffer) override;
 
     /* Callback for PeriodicBlocKDeviceEraser */
     void on_bd_erased(int result);

@@ -27,6 +27,7 @@
 #include "fw_version.h"
 
 #include "mbed-trace/mbed_trace.h"
+#include "platform/mbed_power_mgmt.h"
 
 #include "bootutil/bootutil.h"
 #include "secondary_bd.h"
@@ -41,6 +42,37 @@ static events::EventQueue event_queue(/* event count */ 10 * EVENTS_EVENT_SIZE);
 static ChainableGapEventHandler chainable_gap_event_handler;
 static ChainableGattServerEventHandler chainable_gatt_server_event_handler;
 
+void initiate_system_reset(void);
+
+class FOTADemoEventHandler : public BlockDeviceFOTAEventHandler {
+
+public:
+
+    FOTADemoEventHandler(mbed::BlockDevice &bd, events::EventQueue &queue) :
+        BlockDeviceFOTAEventHandler(bd, queue) { }
+
+    GattAuthCallbackReply_t on_control_written(FOTAService &svc, mbed::Span<const uint8_t> buffer) override {
+        /* Capture the FOTA_COMMIT op code */
+        if(buffer[0] == FOTAService::FOTA_COMMIT) {
+            int err = boot_set_pending(false);
+            if(err) {
+                tr_error("error setting the update candidate as pending: %d", err);
+                svc.notify_status(FOTAService::FOTA_STATUS_INSTALLATION_FAILURE);
+                return AUTH_CALLBACK_REPLY_ATTERR_UNLIKELY_ERROR;
+            } else {
+                tr_info("successfully set the update candidate as pending");
+                /* The delay may not be necessary here */
+                event_queue.call_in(250ms, initiate_system_reset);
+                return AUTH_CALLBACK_REPLY_SUCCESS;
+            }
+        } else {
+            /* Let the BlockDeviceFOTAEventHandler handle the other op codes */
+            return BlockDeviceFOTAEventHandler::on_control_written(svc, buffer);
+        }
+    }
+
+};
+
 class FOTAServiceDemo : ble::Gap::EventHandler {
 
 public:
@@ -52,7 +84,7 @@ public:
             _chainable_gatt_server_eh(chainable_gatt_server_eh),
             _fota_handler(*get_secondary_bd(), event_queue),
             _fota_service(_ble, _event_queue, _chainable_gap_eh, _chainable_gatt_server_eh,
-                    "1.0.0", FW_VERSION),
+                    "1.0.0", FW_VERSION, "primary mcu"),
             _adv_data_builder(_adv_buffer)
     {
     }
@@ -65,6 +97,10 @@ public:
         _ble.init(this, &FOTAServiceDemo::on_init_complete);
 
         _event_queue.dispatch_forever();
+    }
+
+    void disconnect(ble::local_disconnection_reason_t reason) {
+        _ble.gap().disconnect(_connection_handle, reason);
     }
 
 private:
@@ -132,6 +168,7 @@ private:
     void onConnectionComplete(const ble::ConnectionCompleteEvent &event) override
     {
         if (event.getStatus() == ble_error_t::BLE_ERROR_NONE) {
+            _connection_handle = event.getConnectionHandle();
             tr_info("Client connected, you may now subscribe to updates");
         }
     }
@@ -196,16 +233,23 @@ private:
     ChainableGapEventHandler &_chainable_gap_eh;
     ChainableGattServerEventHandler &_chainable_gatt_server_eh;
 
-    BlockDeviceFOTAEventHandler _fota_handler;
+    FOTADemoEventHandler _fota_handler;
     FOTAService _fota_service;
 
     uint8_t _adv_buffer[ble::LEGACY_ADVERTISING_MAX_SIZE];
     ble::AdvertisingDataBuilder _adv_data_builder;
+
+    ble::connection_handle_t _connection_handle = 0;
 };
 
 void schedule_ble_events(BLE::OnEventsToProcessCallbackContext *context)
 {
     event_queue.call(mbed::Callback<void()>(&context->ble, &BLE::processEvents));
+}
+
+void initiate_system_reset(void) {
+    tr_info("initiating system reset...");
+    event_queue.break_dispatch();
 }
 
 int main()
@@ -234,6 +278,14 @@ int main()
     FOTAServiceDemo demo(ble, event_queue, chainable_gap_event_handler,
             chainable_gatt_server_event_handler);
     demo.start();
+
+    tr_info("FOTADemo complete, restarting to apply update...");
+    tr_info("Issuing disconnection");
+    demo.disconnect(ble::local_disconnection_reason_t::POWER_OFF);
+    /* Dispatch any lingering events (is this necessary?) */
+    event_queue.dispatch_for(500ms);
+    /* System reset */
+    system_reset();
 
     return 0;
 }
