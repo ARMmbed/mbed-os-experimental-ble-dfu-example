@@ -5,9 +5,6 @@
  * Built with ARM Mbed-OS
  *
  * Copyright (c) Embedded Planet, Inc - All rights reserved
- * 
- * This source file is private and confidential.
- * Unauthorized copying of this file is strictly prohibited.
  */
 
 #include "PeriodicBlockDeviceEraser.h"
