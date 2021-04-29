@@ -5,13 +5,10 @@
  * Built with ARM Mbed-OS
  *
  * Copyright (c) Embedded Planet, Inc - All rights reserved
- * 
- * This source file is private and confidential.
- * Unauthorized copying of this file is strictly prohibited.
  */
 
-#ifndef TARGET_GALAXIS_APPLICATION_PERIODICBLOCKDEVICEERASER_H_
-#define TARGET_GALAXIS_APPLICATION_PERIODICBLOCKDEVICEERASER_H_
+#ifndef _PERIODICBLOCKDEVICEERASER_H_
+#define _PERIODICBLOCKDEVICEERASER_H_
 
 #include "blockdevice/BlockDevice.h"
 #include "events/EventQueue.h"
@@ -94,4 +91,4 @@ protected:
 
 };
 
-#endif /* TARGET_GALAXIS_APPLICATION_PERIODICBLOCKDEVICEERASER_H_ */
+#endif /*_PERIODICBLOCKDEVICEERASER_H_ */
